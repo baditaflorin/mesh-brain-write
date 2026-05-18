@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
+import { MeshShell } from "@baditaflorin/mesh-common";
 import { Brain, type Mode } from "./features/brain/Brain";
-import { SettingsDrawer } from "./features/settings/SettingsDrawer";
+import { SettingsExtras } from "./features/settings/SettingsExtras";
 import { appConfig } from "./shared/config";
-import { InviteShareButton, MeshBeacon } from "@baditaflorin/mesh-common";
 
 const STORAGE = {
   room: `${appConfig.storagePrefix}:room`,
@@ -53,6 +53,12 @@ function getOrCreatePeerId(): string {
   return id;
 }
 
+/** Programmatically open MeshShell's settings drawer by clicking its FAB. */
+function openMeshSettings() {
+  const fab = document.querySelector<HTMLButtonElement>(".mesh-settings-fab");
+  fab?.click();
+}
+
 export function App() {
   const [roomId, setRoomId] = useState(() => readString(STORAGE.room, "default"));
   const [mode, setMode] = useState<Mode>(() => (readString(STORAGE.mode, "tap") as Mode) || "tap");
@@ -60,7 +66,6 @@ export function App() {
   const [writeDurationMin, setWriteDurationMin] = useState(() => readNumber(STORAGE.writeDur, 5));
   const [isWall, setIsWall] = useState(() => readBool(STORAGE.isWall, false));
   const [tagBindings, setTagBindings] = useState<Record<number, 1 | 2 | 3>>(() => readBindings());
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [peerId] = useState(() => getOrCreatePeerId());
 
@@ -84,7 +89,25 @@ export function App() {
   }, [tagBindings]);
 
   return (
-    <div className="app-root">
+    <MeshShell
+      config={appConfig}
+      roomId={roomId}
+      onRoomChange={setRoomId}
+      settingsExtras={
+        <SettingsExtras
+          mode={mode}
+          onModeChange={setMode}
+          prompt={prompt}
+          onPromptChange={setPrompt}
+          writeDurationMin={writeDurationMin}
+          onWriteDurationMinChange={setWriteDurationMin}
+          isWall={isWall}
+          onIsWallChange={setIsWall}
+          tagBindings={tagBindings}
+          onTagBindingsChange={setTagBindings}
+        />
+      }
+    >
       <Brain
         roomId={roomId}
         myPeerId={peerId}
@@ -93,51 +116,8 @@ export function App() {
         writeDurationMin={writeDurationMin}
         prompt={prompt}
         isWall={isWall}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={openMeshSettings}
       />
-
-      <InviteShareButton appName={appConfig.appName} roomId={roomId} />
-      <MeshBeacon app={appConfig.appName} room={roomId} />
-
-      <button
-        type="button"
-        className="settings-fab"
-        onClick={() => setSettingsOpen(true)}
-        aria-label="Open settings"
-      >
-        ⚙
-      </button>
-
-      <div className="self-ref">
-        <a href={appConfig.repositoryUrl} target="_blank" rel="noreferrer">
-          source
-        </a>
-        <span aria-hidden="true">·</span>
-        <a href={appConfig.paypalUrl} target="_blank" rel="noreferrer">
-          tip ♥
-        </a>
-        <span aria-hidden="true">·</span>
-        <span>
-          v{appConfig.version} · {appConfig.commit}
-        </span>
-      </div>
-
-      <SettingsDrawer
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        roomId={roomId}
-        onRoomChange={setRoomId}
-        mode={mode}
-        onModeChange={setMode}
-        prompt={prompt}
-        onPromptChange={setPrompt}
-        writeDurationMin={writeDurationMin}
-        onWriteDurationMinChange={setWriteDurationMin}
-        isWall={isWall}
-        onIsWallChange={setIsWall}
-        tagBindings={tagBindings}
-        onTagBindingsChange={setTagBindings}
-      />
-    </div>
+    </MeshShell>
   );
 }
