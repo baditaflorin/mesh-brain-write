@@ -467,9 +467,13 @@ export function Brain({
               published.
             </div>
           ) : null}
-          <div className="brain-grid">
+          <div
+            className="brain-grid"
+            data-testid="brain-pool"
+            data-idea-count={shuffledIdeas.length}
+          >
             {shuffledIdeas.map((i) => (
-              <div key={i.id} className="brain-card">
+              <div key={i.id} className="brain-card" data-testid="brain-idea" data-idea-id={i.id}>
                 {i.text}
               </div>
             ))}
@@ -494,6 +498,9 @@ export function Brain({
                   key={i.id}
                   type="button"
                   onClick={() => toggleVote(i.id)}
+                  data-testid="brain-vote-card"
+                  data-idea-id={i.id}
+                  data-vote-count={count}
                   className={"brain-card brain-card-clickable" + (mine ? " brain-card-mine" : "")}
                 >
                   <span>{i.text}</span>
