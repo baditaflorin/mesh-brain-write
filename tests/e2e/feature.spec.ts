@@ -12,16 +12,21 @@ const storagePrefix = pkg.name;
  * "type up to 3 ideas privately on a synced timer, release into a shuffled
  * anonymous pool, dot-vote for the top 3."
  *
- * Concretely (tap mode — the default, no camera needed):
+ * This is the full headline loop across two real peers (tap mode — the
+ * default, no camera needed), and it exercises every shared CRDT key:
  *  - phase is a shared Y.Map: when peer A advances the phase, peer B follows;
- *  - an idea released on peer A lands in the shared Y.Array("ideas") and shows
- *    up in peer B's pool;
- *  - a dot vote cast on peer A increments the count peer B reads from the
- *    nested Y.Map("votes").
+ *  - BOTH peers contribute their own idea privately, then release — so the
+ *    pool is genuinely multi-author and each peer must see the other's idea
+ *    in the shared Y.Array("ideas");
+ *  - voting is collaborative: A and B both dot-vote the SAME idea, and the
+ *    count must aggregate to 2 on both sides (nested Y.Map("votes") merges).
  *
  * This drives the genuine CRDT path (publishMyIdeas + toggleVote), not a stub.
  */
-test("an idea released and voted on peer A propagates to peer B", async ({ browser, baseURL }) => {
+test("two peers each contribute an idea, then collaboratively vote", async ({
+  browser,
+  baseURL,
+}) => {
   const { a, b, cleanup } = await openTwoPeers(browser, baseURL ?? "", { storagePrefix });
   try {
     // Both phones join the brainstorm (arms the Yjs room on each side).
@@ -32,38 +37,48 @@ test("an idea released and voted on peer A propagates to peer B", async ({ brows
     await expect(a.locator(".brain-hud")).toContainText("write");
     await expect(b.locator(".brain-hud")).toContainText("write");
 
-    // Peer A privately types an idea, then advances the shared phase.
-    const ideaText = "ship the cross-peer test";
-    await a.locator("textarea.brain-textarea").first().fill(ideaText);
-    await a.getByRole("button", { name: /i'm done — go to release/i }).click();
+    // Each peer privately types its own idea — nothing is shared yet.
+    const ideaA = "idea from peer A";
+    const ideaB = "idea from peer B";
+    await a.locator("textarea.brain-textarea").first().fill(ideaA);
+    await b.locator("textarea.brain-textarea").first().fill(ideaB);
 
-    // Phase is shared state: peer B must follow A into "release".
+    // Peer A advances the shared phase; B must follow into "release".
+    await a.getByRole("button", { name: /i'm done — go to release/i }).click();
     await expect(b.locator(".brain-hud")).toContainText("release");
 
-    // Peer A releases the idea into the shared anonymous pool.
+    // Both peers release their idea into the shared anonymous pool.
     await a.getByRole("button", { name: /release my .* idea/i }).click();
+    await b.getByRole("button", { name: /release my .* idea/i }).click();
 
-    // Peer B must see the released idea — proves Y.Array("ideas") crossed mesh.
-    await expect(b.locator('[data-testid="brain-pool"]')).toHaveAttribute("data-idea-count", "1");
-    await expect(b.getByText(ideaText)).toBeVisible();
+    // The pool is multi-author: every peer must see BOTH ideas, proving the
+    // Y.Array("ideas") merged writes from two independent peers.
+    await expect(a.locator('[data-testid="brain-pool"]')).toHaveAttribute("data-idea-count", "2");
+    await expect(b.locator('[data-testid="brain-pool"]')).toHaveAttribute("data-idea-count", "2");
+    await expect(a.getByText(ideaB)).toBeVisible();
+    await expect(b.getByText(ideaA)).toBeVisible();
 
-    // Capture the idea id from peer B's pool, then move both peers to vote.
+    // Capture a shared idea id (peer A's idea, as seen in B's pool) to vote on.
     const ideaId = await b
-      .locator('[data-testid="brain-idea"]')
-      .first()
+      .locator('[data-testid="brain-idea"]', { hasText: ideaA })
       .getAttribute("data-idea-id");
     expect(ideaId).toBeTruthy();
 
+    // Move both peers to the vote phase via shared session state.
     await a.getByRole("button", { name: "vote", exact: true }).click();
     await expect(b.locator(".brain-hud")).toContainText("vote");
 
-    // Peer A casts a dot vote.
+    // Collaborative voting: A and B both dot-vote the same idea.
     await a.locator(`[data-testid="brain-vote-card"][data-idea-id="${ideaId}"]`).click();
+    await b.locator(`[data-testid="brain-vote-card"][data-idea-id="${ideaId}"]`).click();
 
-    // Peer B must read the incremented vote count from the nested Y.Map.
+    // The nested Y.Map("votes") must aggregate both dots to 2 on BOTH peers.
+    await expect(
+      a.locator(`[data-testid="brain-vote-card"][data-idea-id="${ideaId}"]`),
+    ).toHaveAttribute("data-vote-count", "2");
     await expect(
       b.locator(`[data-testid="brain-vote-card"][data-idea-id="${ideaId}"]`),
-    ).toHaveAttribute("data-vote-count", "1");
+    ).toHaveAttribute("data-vote-count", "2");
   } finally {
     await cleanup();
   }
