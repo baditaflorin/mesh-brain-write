@@ -1,13 +1,15 @@
-# mesh-brain-write
+# Quiet Draft
 
 [![Live](https://img.shields.io/badge/live-baditaflorin.github.io%2Fmesh--brain--write-8fb8ff?style=flat-square)](https://baditaflorin.github.io/mesh-brain-write/)
 [![Version](https://img.shields.io/github/package-json/v/baditaflorin/mesh-brain-write?style=flat-square&color=8a7a4a)](https://github.com/baditaflorin/mesh-brain-write/blob/main/package.json)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![No backend](https://img.shields.io/badge/backend-none-1a160a?style=flat-square)](docs/adr/0001-deployment-mode.md)
 
-> Peer-to-peer mesh brainwrite: type up to 3 ideas privately on a synced timer, release into a shuffled anonymous pool, dot-vote for the top 3. ArUco mode for paper index cards.
+> A private, peer-to-peer writing room: draft up to three ideas on a synced timer, release them anonymously, then let the group find the signal.
 
 **Live:** https://baditaflorin.github.io/mesh-brain-write/
+
+![Quiet Draft on a phone](public/previews/quiet-draft-phone.png)
 
 A four-phase brainwriting flow over y-webrtc + Yjs:
 
@@ -21,6 +23,8 @@ A four-phase brainwriting flow over y-webrtc + Yjs:
 In ArUco mode, write each idea on a paper index card with a printed tag in
 the corner; hold each card up to the wall camera during release to publish
 that idea.
+
+Quiet Draft is designed for the first five minutes of a workshop: every writer gets a focused private notebook first, then the room gets a calm reading board. The product-facing name deliberately stays separate from the stable `mesh-brain-write` repository, storage, and room identifiers.
 
 ## How it works
 
@@ -36,12 +40,22 @@ that idea.
 4. Voting tracks `Y.Map<ideaId, Y.Map<peerId, true>>` to enforce 3 dots
    per person.
 
+## Experience contract
+
+- **Private by default.** Opening the page does not create a WebRTC room; the writer explicitly chooses **Start a private draft** first.
+- **Honest presence.** Once joined, the product bar and workshop header report the feature-owned room, actual peer count, and current shared phase.
+- **Responsive first action.** The invitation and the first draft field are covered at `390×844` and `1141×602` in Playwright, alongside keyboard and two-peer CRDT coverage.
+- **Accessible controls.** The room brief, first draft field, workshop phase controls, and Settings drawer all have semantic labels and visible focus states.
+
 ## Privacy threat model
 
 See [docs/privacy.md](docs/privacy.md). Released ideas carry no peer
 identity; pending entries are technically readable by other peers via
 the CRDT but UI-hidden — this isn't a "your boss can debug-inspect
 during a brainstorm" tool.
+
+The release dependency and secret-scan results live in
+[docs/security-audit-2026-08-26.md](docs/security-audit-2026-08-26.md).
 
 ## Print the tag sheet
 

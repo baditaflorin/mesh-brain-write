@@ -13,6 +13,10 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 5_000 },
   fullyParallel: false,
+  // Two independent browser contexts deliberately enter the same Yjs room in
+  // the feature suite. Keep the suite serial on laptops and Woodpecker alike
+  // so a concurrent generic smoke page cannot race the shared room setup.
+  workers: 1,
   reporter: process.env["CI"] ? "list" : [["list"], ["json", { outputFile: "test-results.json" }]],
   use: {
     baseURL,
