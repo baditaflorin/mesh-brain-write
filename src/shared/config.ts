@@ -1,9 +1,12 @@
 export const appConfig = {
   appName: "mesh-brain-write",
+  displayName: "Quiet Draft",
+  visualProfile: "gather",
+  shellLayout: "inset",
   storagePrefix: "mesh-brain-write",
   description:
-    "Peer-to-peer mesh: silent brainstorm. Type ideas privately on a timer; pooled anonymously. ArUco mode for paper ideas.",
-  accentHex: "#8fb8ff",
+    "A private, peer-to-peer writing room where small drafts become an anonymous shared board.",
+  accentHex: "#e3bd6c",
   version: __APP_VERSION__,
   commit: __GIT_COMMIT__,
   repositoryUrl: "https://github.com/baditaflorin/mesh-brain-write",

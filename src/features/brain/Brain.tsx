@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
+import { MeshShellConnectionBridge, type YRoom } from "@baditaflorin/mesh-common";
 import { createRoomSync } from "../sync/yjsRoom";
 import { createClockSync } from "../sync/clockSync";
 import { maybeFetchTurnCredentials } from "../sync/iceConfig";
@@ -77,6 +78,22 @@ export function Brain({
     const clock = createClockSync(room.provider);
     return { room, clock };
   }, [armed, roomId]);
+
+  // This feature owns its WebRTC room rather than asking MeshShell to create
+  // a second transport. Report exactly that live room once the writer has
+  // chosen to enter it, so the shared chrome can show honest connection
+  // diagnostics without inventing a connected state on the landing screen.
+  const reportedRoom = useMemo<YRoom | null>(() => {
+    if (!meshHandle) return null;
+    return {
+      doc: meshHandle.room.doc,
+      provider: meshHandle.room.provider,
+      peerId: meshHandle.room.peerId,
+      deviceId: myPeerId,
+      peerCount: peers,
+      roomId,
+    };
+  }, [meshHandle, myPeerId, peers, roomId]);
 
   useEffect(() => {
     if (!armed) return;
@@ -354,46 +371,120 @@ export function Brain({
     return [...ideas].sort((a, b) => (votes[b.id]?.size ?? 0) - (votes[a.id]?.size ?? 0));
   }, [ideas, votes]);
 
+  const submittedCount = [pending1, pending2, pending3].filter((idea) => idea.trim()).length;
+  const phaseGuidance: Record<Phase, string> = {
+    write: "Write privately. Nothing you type is visible to the room yet.",
+    release: "Release drafts into a shuffled, anonymous reading board.",
+    vote: "Use up to three dots to find the ideas worth carrying forward.",
+    results: "Review the strongest signals from the room.",
+  };
+
   if (!armed) {
     return (
       <div className="brain-arm">
-        <h1>mesh-brain-write</h1>
-        <p>
-          Silent brainstorm. Type up to 3 ideas privately on a timer. When the timer hits zero,
-          everyone's ideas flow into a shuffled anonymous list for voting.
-          {mode === "apriltag"
-            ? " ArUco mode: write each idea on its own index card with a printed tag glued in the corner; hold them up to the wall camera during release."
-            : null}
-        </p>
-        <p className="brain-arm-info">
-          Role: <code>{isWall ? "wall display" : "writer"}</code> · {writeDurationMin} min write
-        </p>
-        <button type="button" className="brain-arm-button" onClick={arm}>
-          {isWall ? "Open the wall display" : "Join the brainstorm"}
-        </button>
-        <button type="button" className="brain-arm-secondary" onClick={onOpenSettings}>
-          Open settings
-        </button>
-        <p className="brain-hint">
-          Room <code>{roomId}</code> · prompt <em>"{prompt}"</em>
-        </p>
+        <div className="brain-landing-glow" aria-hidden="true" />
+        <main className="brain-landing" aria-labelledby="quiet-draft-title">
+          <section className="brain-landing-copy">
+            <p className="brain-eyebrow">Private collaborative writing</p>
+            <h1 id="quiet-draft-title">Quiet Draft</h1>
+            <p className="brain-landing-lede">
+              A calmer way to think together. Draft a few possibilities in private, then release
+              them into an anonymous room for collective judgment.
+            </p>
+
+            <dl className="brain-landing-facts">
+              <div>
+                <dt>Room</dt>
+                <dd>{roomId}</dd>
+              </div>
+              <div>
+                <dt>Format</dt>
+                <dd>{writeDurationMin} minute private draft</dd>
+              </div>
+              <div>
+                <dt>Role</dt>
+                <dd>{isWall ? "Shared display" : "Writer"}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <aside className="brain-landing-card" aria-label="How Quiet Draft works">
+            <div className="brain-landing-card-topline">
+              <span className="brain-status-dot" aria-hidden="true" />
+              <span>Room ready to join</span>
+            </div>
+            <ol className="brain-ritual-list">
+              <li>
+                <span>01</span>
+                <div>
+                  <strong>Draft in private</strong>
+                  <p>Capture up to three thoughts without watching the room.</p>
+                </div>
+              </li>
+              <li>
+                <span>02</span>
+                <div>
+                  <strong>Release together</strong>
+                  <p>Ideas arrive as a shuffled, anonymous collection.</p>
+                </div>
+              </li>
+              <li>
+                <span>03</span>
+                <div>
+                  <strong>Find the signal</strong>
+                  <p>Use three dots to make the strongest ideas visible.</p>
+                </div>
+              </li>
+            </ol>
+            <button
+              type="button"
+              className="brain-arm-button"
+              aria-label="Join the brainstorm — start a private draft"
+              onClick={arm}
+            >
+              {isWall ? "Open the shared display" : "Start a private draft"}
+            </button>
+            <button type="button" className="brain-arm-secondary" onClick={onOpenSettings}>
+              Set the room brief
+            </button>
+            <p className="brain-landing-footnote">
+              {mode === "apriltag"
+                ? "Card scanning is enabled for this room."
+                : "Your room connects only after you choose to enter."}
+            </p>
+          </aside>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="brain-stage">
-      <div className="brain-hud">
-        <span>{peers + 1} phones</span>
-        <span aria-hidden="true">·</span>
-        <span>{session.phase}</span>
-        {lastMarker !== null ? (
-          <>
-            <span aria-hidden="true">·</span>
-            <span>last #{lastMarker}</span>
-          </>
-        ) : null}
-      </div>
+    <main className="brain-stage" aria-labelledby="quiet-draft-session">
+      <MeshShellConnectionBridge room={reportedRoom} />
+      <header className="brain-session-header">
+        <div>
+          <p className="brain-eyebrow">Quiet Draft</p>
+          <h1 id="quiet-draft-session">
+            {session.phase === "write"
+              ? "Make space for a better thought."
+              : "The room is thinking together."}
+          </h1>
+        </div>
+        <div className="brain-hud" aria-live="polite">
+          <span className="brain-presence-dot" aria-hidden="true" />
+          <span>
+            {peers + 1} {peers === 0 ? "writer" : "writers"}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>{session.phase}</span>
+          {lastMarker !== null ? (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>card #{lastMarker}</span>
+            </>
+          ) : null}
+        </div>
+      </header>
 
       {isWall && mode === "apriltag" && session.phase === "release" && (
         <canvas
@@ -405,66 +496,100 @@ export function Brain({
         />
       )}
 
-      <div className="brain-phase-bar">
+      <nav className="brain-phase-bar" aria-label="Workshop phases">
         {(["write", "release", "vote", "results"] as Phase[]).map((p) => (
           <button
             key={p}
             type="button"
             className={"brain-phase-btn" + (session.phase === p ? " brain-phase-active" : "")}
             onClick={() => setPhase(p)}
+            aria-current={session.phase === p ? "step" : undefined}
           >
             {p}
           </button>
         ))}
-      </div>
+      </nav>
 
-      <div className="brain-prompt">{session.prompt}</div>
+      <section className="brain-brief" aria-label="Writing brief">
+        <p className="brain-brief-label">Today&apos;s prompt</p>
+        <p className="brain-prompt">{session.prompt}</p>
+        <p className="brain-phase-guidance">{phaseGuidance[session.phase]}</p>
+      </section>
 
       {session.phase === "write" && (
-        <>
-          <div className="brain-countdown">{formatClock(writeRemainingS)}</div>
+        <section className="brain-write-layout" aria-label="Private writing workspace">
+          <div className="brain-clock-panel">
+            <p className="brain-clock-label">Private draft window</p>
+            <div
+              className="brain-countdown"
+              aria-label={`${formatClock(writeRemainingS)} remaining`}
+            >
+              {formatClock(writeRemainingS)}
+            </div>
+            <p className="brain-clock-note">
+              {isWall
+                ? "This display is holding the brief while writers contribute privately."
+                : `${submittedCount} of 3 draft${submittedCount === 1 ? "" : "s"} started`}
+            </p>
+          </div>
           {!isWall && (
             <div className="brain-write">
+              <div className="brain-write-heading">
+                <p>Private notebook</p>
+                <span>Only you can see these until release.</span>
+              </div>
               {[1, 2, 3].map((slot) => (
-                <textarea
-                  key={slot}
-                  className="brain-textarea"
-                  placeholder={`Idea ${slot}`}
-                  value={slot === 1 ? pending1 : slot === 2 ? pending2 : pending3}
-                  onChange={(e) => {
-                    if (slot === 1) setPending1(e.target.value);
-                    if (slot === 2) setPending2(e.target.value);
-                    if (slot === 3) setPending3(e.target.value);
-                  }}
-                  rows={2}
-                />
+                <label key={slot} className="brain-draft-card">
+                  <span>Draft {slot}</span>
+                  <textarea
+                    className="brain-textarea"
+                    aria-label={`Idea ${slot}`}
+                    placeholder={
+                      slot === 1 ? "Start with the most obvious possibility…" : "Add another angle…"
+                    }
+                    value={slot === 1 ? pending1 : slot === 2 ? pending2 : pending3}
+                    onChange={(e) => {
+                      if (slot === 1) setPending1(e.target.value);
+                      if (slot === 2) setPending2(e.target.value);
+                      if (slot === 3) setPending3(e.target.value);
+                    }}
+                    rows={2}
+                  />
+                </label>
               ))}
               <div className="brain-write-actions">
                 <button type="button" onClick={() => setPhase("release")}>
-                  I'm done — go to release
+                  I&apos;m done — go to release
                 </button>
               </div>
             </div>
           )}
-        </>
+          {isWall && (
+            <div className="brain-wall-note">The shared display never exposes private drafts.</div>
+          )}
+        </section>
       )}
 
       {session.phase === "release" && (
-        <>
+        <section className="brain-board-stage" aria-label="Anonymous idea board">
           {!isWall && mode === "tap" ? (
             <div className="brain-release-tap">
+              <p className="brain-board-kicker">Anonymous board</p>
+              <h2>Ready when you are.</h2>
+              <p>Release only the drafts you want the room to consider.</p>
               <button
                 type="button"
                 onClick={publishMyIdeas}
                 disabled={!pending1.trim() && !pending2.trim() && !pending3.trim()}
               >
-                Release my {[pending1, pending2, pending3].filter((t) => t.trim()).length} idea(s)
+                Release my {submittedCount} idea{submittedCount === 1 ? "" : "s"}
               </button>
             </div>
           ) : !isWall && mode === "apriltag" ? (
             <div className="brain-release-tag">
-              Hold each tagged card up to the wall camera. Your ideas will appear here as they're
-              published.
+              <p className="brain-board-kicker">Card release</p>
+              Hold each tagged card up to the shared display. Your ideas will appear here as they
+              are published.
             </div>
           ) : null}
           <div
@@ -478,16 +603,19 @@ export function Brain({
               </div>
             ))}
             {shuffledIdeas.length === 0 && (
-              <div className="brain-empty">No ideas released yet.</div>
+              <div className="brain-empty">The board is waiting for its first released draft.</div>
             )}
           </div>
-        </>
+        </section>
       )}
 
       {session.phase === "vote" && (
-        <>
+        <section className="brain-board-stage" aria-label="Collaborative vote">
           <div className="brain-vote-hud">
-            {dotsLeft} dot{dotsLeft === 1 ? "" : "s"} left
+            <span className="brain-board-kicker">Your signal</span>
+            <strong>
+              {dotsLeft} dot{dotsLeft === 1 ? "" : "s"} left
+            </strong>
           </div>
           <div className="brain-grid">
             {shuffledIdeas.map((i) => {
@@ -509,20 +637,27 @@ export function Brain({
               );
             })}
           </div>
-        </>
+        </section>
       )}
 
       {session.phase === "results" && (
-        <div className="brain-grid">
-          {sortedByVotes.map((i, idx) => (
-            <div key={i.id} className={"brain-card" + (idx < 3 ? " brain-card-top" : "")}>
-              <span>{i.text}</span>
-              <span className="brain-card-dots">●{votes[i.id]?.size ?? 0}</span>
-            </div>
-          ))}
-        </div>
+        <section className="brain-board-stage" aria-label="Workshop results">
+          <div className="brain-results-intro">
+            <p className="brain-board-kicker">What the room chose</p>
+            <h2>The strongest signals, in order.</h2>
+          </div>
+          <div className="brain-grid">
+            {sortedByVotes.map((i, idx) => (
+              <div key={i.id} className={"brain-card" + (idx < 3 ? " brain-card-top" : "")}>
+                <span>{i.text}</span>
+                <span className="brain-card-dots">●{votes[i.id]?.size ?? 0}</span>
+              </div>
+            ))}
+            {sortedByVotes.length === 0 && <div className="brain-empty">No votes yet.</div>}
+          </div>
+        </section>
       )}
-    </div>
+    </main>
   );
 }
 

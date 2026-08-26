@@ -1,7 +1,7 @@
 {
   "name": "mesh-brain-write",
   "version": "0.1.1",
-  "description": "Peer-to-peer mesh: silent brainstorm. Type ideas privately on a timer; pooled anonymously. ArUco mode for paper ideas.",
+  "description": "Quiet Draft: private peer-to-peer collaborative writing with anonymous release and group voting.",
   "type": "module",
   "private": false,
   "homepage": "https://baditaflorin.github.io/mesh-brain-write/",
@@ -32,28 +32,28 @@
     "test:leak": "MESH_RUN_LEAK_TEST=1 playwright test tests/e2e/memory-leak.spec.ts"
   },
   "dependencies": {
+    "@baditaflorin/mesh-common": "file:../mesh-common",
     "js-aruco2": "^2.0.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "y-webrtc": "^10.3.0",
-    "yjs": "^13.6.27",
-    "@baditaflorin/mesh-common": "file:../mesh-common"
+    "yjs": "^13.6.27"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@testing-library/jest-dom": "^6.6.0",
+    "@testing-library/react": "^16.1.0",
     "@types/node": "^22.10.0",
     "@types/react": "^19.2.6",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "jsdom": "^26.0.0",
     "pdfkit": "^0.18.0",
     "pngjs": "^7.0.0",
     "prettier": "^3.7.4",
     "typescript": "^5.9.3",
     "vite": "^7.0.0",
-    "vitest": "^2.1.0",
-    "@playwright/test": "^1.50.0",
-    "@testing-library/jest-dom": "^6.6.0",
-    "@testing-library/react": "^16.1.0",
-    "jsdom": "^26.0.0"
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=22"
