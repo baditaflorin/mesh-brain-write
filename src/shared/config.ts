@@ -1,5 +1,6 @@
 export const appConfig = {
   appName: "mesh-brain-write",
+  breadcrumbs: false,
   displayName: "Quiet Draft",
   visualProfile: "gather",
   shellLayout: "inset",
